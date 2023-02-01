@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 	"time"

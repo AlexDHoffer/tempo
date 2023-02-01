@@ -69,6 +69,12 @@ func New(cfg *Config, overrides metricsGeneratorOverrides, reg prometheus.Regist
 		return nil, fmt.Errorf("failed to mkdir on %s: %w", cfg.Storage.Path, err)
 	}
 
+	fmt.Println("New from generator.go")
+	fmt.Println("overrides:")
+	fmt.Println(overrides)
+	fmt.Println("cfg:")
+	fmt.Println(cfg)
+
 	g := &Generator{
 		cfg:       cfg,
 		overrides: overrides,

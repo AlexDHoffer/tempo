@@ -147,6 +147,12 @@ func (i *instance) updateProcessors() error {
 
 	fmt.Println("Desired Processors from updateProcessors:")
 	fmt.Println(desiredProcessors)
+		//case spanmetrics.LatencyName:
+    	//    cfg.SpanMetrics.Counts = false
+    	//   newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
+    	//case spanmetrics.CountsName:
+    	//    cfg.SpanMetrics.Latency = false
+    	//    cfg.SpanMetrics.HistogramBuckets = nil
 	desiredCfg, err := i.cfg.Processor.copyWithOverrides(i.overrides, i.instanceID)
 	fmt.Println("Desired Cfg from updateProcessors:")
 	fmt.Println(desiredCfg.SpanMetrics)
