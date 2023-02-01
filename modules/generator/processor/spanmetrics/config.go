@@ -9,6 +9,8 @@ import (
 
 const (
 	Name = "span-metrics"
+	LatencyName = "span-metrics-latency"
+	CountsName = "span-metrics-counts"
 
 	dimService       = "service"
 	dimSpanName      = "span_name"
@@ -18,6 +20,9 @@ const (
 )
 
 type Config struct {
+    Latency bool
+    Counts bool
+
 	// Buckets for latency histogram in seconds.
 	HistogramBuckets []float64 `yaml:"histogram_buckets"`
 	// Intrinsic dimensions (labels) added to the metric, that are generated from fixed span
@@ -30,6 +35,8 @@ type Config struct {
 }
 
 func (cfg *Config) RegisterFlagsAndApplyDefaults(prefix string, f *flag.FlagSet) {
+    cfg.Latency = true
+    cfg.Counts = true
 	cfg.HistogramBuckets = prometheus.ExponentialBuckets(0.002, 2, 14)
 	cfg.IntrinsicDimensions.Service = true
 	cfg.IntrinsicDimensions.SpanName = true

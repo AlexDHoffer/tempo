@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	allSupportedProcessors = []string{servicegraphs.Name, spanmetrics.Name}
+	allSupportedProcessors = []string{servicegraphs.Name, spanmetrics.Name, spanmetrics.LatencyName, spanmetrics.CountsName}
 
 	metricActiveProcessors = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "tempo",
@@ -126,7 +126,30 @@ func (i *instance) watchOverrides() {
 
 func (i *instance) updateProcessors() error {
 	desiredProcessors := i.overrides.MetricsGeneratorProcessors(i.instanceID)
+
+    // If span-metrics is indicated, no other subprocessor matters. Mark Counts and Latency as true in the config.
+    // If both subprocessors are indicated, it's the same as span-metrics.
+    // Individual indications mean either Counts or Latency are true and the other is false.
+	_, spanMetricsAll := desiredProcessors["span-metrics"]
+	_, spanMetricsCount := desiredProcessors["span-metrics-count"]
+	_, spanMetricsLatency := desiredProcessors["span-metrics-latency"]
+
+	if spanMetricsAll {
+	    delete(desiredProcessors, "span-metrics-count")
+        delete(desiredProcessors, "span-metrics-latency")
+	}
+
+	if (spanMetricsCount && spanMetricsLatency) {
+	    delete(desiredProcessors, "span-metrics-count")
+        delete(desiredProcessors, "span-metrics-latency")
+        desiredProcessors["span-metrics"] = struct{}{}
+	}
+
+	fmt.Println("Desired Processors from updateProcessors:")
+	fmt.Println(desiredProcessors)
 	desiredCfg, err := i.cfg.Processor.copyWithOverrides(i.overrides, i.instanceID)
+	fmt.Println("Desired Cfg from updateProcessors:")
+	fmt.Println(desiredCfg.SpanMetrics)
 	if err != nil {
 		return err
 	}
@@ -212,6 +235,13 @@ func (i *instance) addProcessor(processorName string, cfg ProcessorConfig) error
 	switch processorName {
 	case spanmetrics.Name:
 		newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
+	case spanmetrics.LatencyName:
+	    cfg.SpanMetrics.Counts = false
+	    newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
+	case spanmetrics.CountsName:
+	    cfg.SpanMetrics.Latency = false
+	    cfg.SpanMetrics.HistogramBuckets = nil
+	    newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
 	case servicegraphs.Name:
 		newProcessor = servicegraphs.New(cfg.ServiceGraphs, i.instanceID, i.registry, i.logger)
 	default:

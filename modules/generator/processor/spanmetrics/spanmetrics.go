@@ -2,6 +2,7 @@ package spanmetrics
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -36,6 +37,9 @@ type Processor struct {
 }
 
 func New(cfg Config, registry registry.Registry) gen.Processor {
+    fmt.Println("Cfg from New:")
+    fmt.Println(cfg)
+
 	labels := make([]string, 0, 4+len(cfg.Dimensions))
 
 	if cfg.IntrinsicDimensions.Service {
@@ -58,14 +62,32 @@ func New(cfg Config, registry registry.Registry) gen.Processor {
 		labels = append(labels, sanitizeLabelNameWithCollisions(d))
 	}
 
-	return &Processor{
-		Cfg:                        cfg,
-		registry:                   registry,
-		spanMetricsCallsTotal:      registry.NewCounter(metricCallsTotal, labels),
-		spanMetricsDurationSeconds: registry.NewHistogram(metricDurationSeconds, labels, cfg.HistogramBuckets),
-		spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
-		now:                        time.Now,
-	}
+	if (cfg.Latency && cfg.Counts) {
+        return &Processor{
+            Cfg:                        cfg,
+            registry:                   registry,
+            spanMetricsCallsTotal:      registry.NewCounter(metricCallsTotal, labels),
+            spanMetricsDurationSeconds: registry.NewHistogram(metricDurationSeconds, labels, cfg.HistogramBuckets),
+            spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
+            now:                        time.Now,
+        }
+    } else if (cfg.Latency) {
+        return &Processor{
+            Cfg:                        cfg,
+            registry:                   registry,
+            spanMetricsDurationSeconds: registry.NewHistogram(metricDurationSeconds, labels, cfg.HistogramBuckets),
+            spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
+            now:                        time.Now,
+        }
+    } else {
+        return &Processor{
+            Cfg:                        cfg,
+            registry:                   registry,
+            spanMetricsCallsTotal:      registry.NewCounter(metricCallsTotal, labels),
+            spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
+            now:                        time.Now,
+        }
+    }
 }
 
 func (p *Processor) Name() string {
@@ -122,9 +144,15 @@ func (p *Processor) aggregateMetricsForSpan(svcName string, rs *v1.Resource, spa
 
 	registryLabelValues := p.registry.NewLabelValues(labelValues)
 
-	p.spanMetricsCallsTotal.Inc(registryLabelValues, 1)
+    if p.Cfg.Counts {
+	    p.spanMetricsCallsTotal.Inc(registryLabelValues, 1)
+	}
+
 	p.spanMetricsSizeTotal.Inc(registryLabelValues, float64(span.Size()))
-	p.spanMetricsDurationSeconds.ObserveWithExemplar(registryLabelValues, latencySeconds, tempo_util.TraceIDToHexString(span.TraceId))
+
+	if p.Cfg.Latency {
+	    p.spanMetricsDurationSeconds.ObserveWithExemplar(registryLabelValues, latencySeconds, tempo_util.TraceIDToHexString(span.TraceId))
+	}
 }
 
 func sanitizeLabelNameWithCollisions(name string) string {

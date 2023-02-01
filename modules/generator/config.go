@@ -2,6 +2,7 @@ package generator
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -54,6 +55,9 @@ func (cfg *ProcessorConfig) RegisterFlagsAndApplyDefaults(prefix string, f *flag
 // copyWithOverrides creates a copy of the config using values set in the overrides.
 func (cfg *ProcessorConfig) copyWithOverrides(o metricsGeneratorOverrides, userID string) (ProcessorConfig, error) {
 	copyCfg := *cfg
+
+	fmt.Println("copyCfg from copyWithOverrides")
+	fmt.Println(copyCfg.SpanMetrics)
 
 	if buckets := o.MetricsGeneratorProcessorServiceGraphsHistogramBuckets(userID); buckets != nil {
 		copyCfg.ServiceGraphs.HistogramBuckets = buckets
