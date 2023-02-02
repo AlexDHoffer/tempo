@@ -24,7 +24,6 @@ import (
 
 var (
 	allSupportedProcessors = []string{servicegraphs.Name, spanmetrics.Name}
-	//allSupportedSubprocessors = []string{spanmetrics.LatencySubprocessorName, spanmetrics.CountSubprocessorName}
 
 	metricActiveProcessors = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "tempo",
@@ -76,32 +75,37 @@ type instance struct {
 	logger log.Logger
 }
 
-// If the overrides field has the item "span-metrics", we look no further and remove any span metric subprocessors
-// If we see both span metric subprocessors, we replace this item with "span-metrics", as they are the same thing, and use default behavior
-// If we see only one or the other subprocessor, we replace the item with "span-metrics", and toggle on the Subprocessor chosen
+// Look at the processors and see if any are actually span-metrics subprocessors
+// If they are, set the appropriate flags in the spanmetrics struct
 func setSpanMetricsSubprocessors(cfg *Config, instanceID string, overrides metricsGeneratorOverrides) {
     desiredProcessors := overrides.MetricsGeneratorProcessors(instanceID)
 
-    _, spanMetricsAll := desiredProcessors["span-metrics"]
-    _, spanMetricsCount := desiredProcessors["span-metrics-count"]
-    _, spanMetricsLatency := desiredProcessors["span-metrics-latency"]
+    _, countOk := desiredProcessors["span-metrics-count"]
+    _, latencyOk := desiredProcessors["span-metrics-latency"]
 
-    if spanMetricsAll {
+    if _, ok := desiredProcessors["span-metrics"]; ok {
+        if countOk {
+            delete(desiredProcessors, "span-metrics-count")
+        }
+        if latencyOk {
+            delete(desiredProcessors, "span-metrics-latency")
+        }
+        return
+    }
+
+    if countOk && latencyOk {
         delete(desiredProcessors, "span-metrics-latency")
         delete(desiredProcessors, "span-metrics-count")
-    } else if (spanMetricsCount && spanMetricsLatency) {
-        delete(desiredProcessors, "span-metrics-latency")
-        delete(desiredProcessors, "span-metrics-count")
-        desiredProcessors["span-metrics"] = struct{}{}
-    } else if (spanMetricsLatency) {
-        delete(desiredProcessors, "span-metrics-latency")
-        desiredProcessors["span-metrics"] = struct{}{}
-        cfg.Processor.SpanMetrics.Subprocessors["Count"] = false
-    } else if (spanMetricsCount) {
+        desiredProcessors["span-metrics-count"] = struct{}{}
+    } else if countOk {
         delete(desiredProcessors, "span-metrics-count")
         desiredProcessors["span-metrics"] = struct{}{}
         cfg.Processor.SpanMetrics.Subprocessors["Latency"] = false
         cfg.Processor.SpanMetrics.HistogramBuckets = nil
+    } else if latencyOk {
+        delete(desiredProcessors, "span-metrics-latency")
+        desiredProcessors["span-metrics"] = struct{}{}
+        cfg.Processor.SpanMetrics.Subprocessors["Count"] = false
     }
 }
 
