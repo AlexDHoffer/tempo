@@ -56,9 +56,6 @@ func (cfg *ProcessorConfig) RegisterFlagsAndApplyDefaults(prefix string, f *flag
 func (cfg *ProcessorConfig) copyWithOverrides(o metricsGeneratorOverrides, userID string) (ProcessorConfig, error) {
 	copyCfg := *cfg
 
-	copyCfg.SpanMetrics.Latency = false
-	copyCfg.SpanMetrics.HistogramBuckets = nil
-
 	fmt.Println("copyCfg from copyWithOverrides")
 	fmt.Println(copyCfg.SpanMetrics)
 
@@ -68,9 +65,9 @@ func (cfg *ProcessorConfig) copyWithOverrides(o metricsGeneratorOverrides, userI
 	if dimensions := o.MetricsGeneratorProcessorServiceGraphsDimensions(userID); dimensions != nil {
 		copyCfg.ServiceGraphs.Dimensions = dimensions
 	}
-	//if buckets := o.MetricsGeneratorProcessorSpanMetricsHistogramBuckets(userID); buckets != nil {
-	//	copyCfg.SpanMetrics.HistogramBuckets = buckets
-	//}
+	if buckets := o.MetricsGeneratorProcessorSpanMetricsHistogramBuckets(userID); buckets != nil {
+		copyCfg.SpanMetrics.HistogramBuckets = buckets
+	}
 	if dimensions := o.MetricsGeneratorProcessorSpanMetricsDimensions(userID); dimensions != nil {
 		copyCfg.SpanMetrics.Dimensions = dimensions
 	}

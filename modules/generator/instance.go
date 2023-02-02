@@ -23,7 +23,8 @@ import (
 )
 
 var (
-	allSupportedProcessors = []string{servicegraphs.Name, spanmetrics.Name, spanmetrics.LatencyName, spanmetrics.CountsName}
+	allSupportedProcessors = []string{servicegraphs.Name, spanmetrics.Name}
+	//allSupportedSubprocessors = []string{spanmetrics.LatencySubprocessorName, spanmetrics.CountSubprocessorName}
 
 	metricActiveProcessors = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "tempo",
@@ -75,8 +76,50 @@ type instance struct {
 	logger log.Logger
 }
 
+// If the overrides field has the item "span-metrics", we look no further and remove any span metric subprocessors
+// If we see both span metric subprocessors, we replace this item with "span-metrics", as they are the same thing, and use default behavior
+// If we see only one or the other subprocessor, we replace the item with "span-metrics", and toggle on the Subprocessor chosen
+func setSpanMetricsSubprocessors(cfg *Config, instanceID string, overrides metricsGeneratorOverrides) {
+    //fmt.Println("overrides from newInstance")
+    //fmt.Println(overrides.MetricsGeneratorProcessors(instanceID))
+    desiredProcessors := overrides.MetricsGeneratorProcessors(instanceID)
+
+    //fmt.Println("config from newInstance")
+    c := *cfg
+    spanMetricsConfig := c.Processor.SpanMetrics
+    //fmt.Println(c.Processor.SpanMetrics)
+
+    _, spanMetricsAll := desiredProcessors["span-metrics"]
+    _, spanMetricsCount := desiredProcessors["span-metrics-count"]
+    _, spanMetricsLatency := desiredProcessors["span-metrics-latency"]
+
+    if spanMetricsAll {
+        delete(desiredProcessors, "span-metrics-latency")
+        delete(desiredProcessors, "span-metrics-count")
+    } else if (spanMetricsCount && spanMetricsLatency) {
+        delete(desiredProcessors, "span-metrics-latency")
+        delete(desiredProcessors, "span-metrics-count")
+        desiredProcessors["span-metrics"] = struct{}{}
+    } else if (spanMetricsLatency) {
+        delete(desiredProcessors, "span-metrics-latency")
+        desiredProcessors["span-metrics"] = struct{}{}
+        spanMetricsConfig.Subprocessors["Count"] = false
+    } else if (spanMetricsCount) {
+        delete(desiredProcessors, "span-metrics-count")
+        desiredProcessors["span-metrics"] = struct{}{}
+        spanMetricsConfig.Subprocessors["Latency"] = false
+        spanMetricsConfig.HistogramBuckets = nil
+    }
+}
+
 func newInstance(cfg *Config, instanceID string, overrides metricsGeneratorOverrides, wal storage.Storage, reg prometheus.Registerer, logger log.Logger) (*instance, error) {
 	logger = log.With(logger, "tenant", instanceID)
+
+	setSpanMetricsSubprocessors(cfg, instanceID, overrides)
+	fmt.Println("From newInstance")
+	// This nil is only sticking here, not in setSpanMetricsSubprocessors
+	cfg.Processor.SpanMetrics.HistogramBuckets = nil
+	fmt.Println(cfg.Processor.SpanMetrics)
 
 	i := &instance{
 		cfg:        cfg,
@@ -127,35 +170,11 @@ func (i *instance) watchOverrides() {
 func (i *instance) updateProcessors() error {
 	desiredProcessors := i.overrides.MetricsGeneratorProcessors(i.instanceID)
 
-    // If span-metrics is indicated, no other subprocessor matters. Mark Counts and Latency as true in the config.
-    // If both subprocessors are indicated, it's the same as span-metrics.
-    // Individual indications mean either Counts or Latency are true and the other is false.
-	_, spanMetricsAll := desiredProcessors["span-metrics"]
-	_, spanMetricsCount := desiredProcessors["span-metrics-count"]
-	_, spanMetricsLatency := desiredProcessors["span-metrics-latency"]
-
-	if spanMetricsAll {
-	    delete(desiredProcessors, "span-metrics-count")
-        delete(desiredProcessors, "span-metrics-latency")
-	}
-
-	if (spanMetricsCount && spanMetricsLatency) {
-	    delete(desiredProcessors, "span-metrics-count")
-        delete(desiredProcessors, "span-metrics-latency")
-        desiredProcessors["span-metrics"] = struct{}{}
-	}
-
 	fmt.Println("Desired Processors from updateProcessors:")
 	fmt.Println(desiredProcessors)
-		//case spanmetrics.LatencyName:
-    	//    cfg.SpanMetrics.Counts = false
-    	//   newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
-    	//case spanmetrics.CountsName:
-    	//    cfg.SpanMetrics.Latency = false
-    	//    cfg.SpanMetrics.HistogramBuckets = nil
+    fmt.Println("Desired Cfg from updateProcessors:")
+    fmt.Println(i.cfg.Processor)
 	desiredCfg, err := i.cfg.Processor.copyWithOverrides(i.overrides, i.instanceID)
-	fmt.Println("Desired Cfg from updateProcessors:")
-	fmt.Println(desiredCfg.SpanMetrics)
 	if err != nil {
 		return err
 	}
@@ -241,13 +260,6 @@ func (i *instance) addProcessor(processorName string, cfg ProcessorConfig) error
 	switch processorName {
 	case spanmetrics.Name:
 		newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
-	case spanmetrics.LatencyName:
-	    cfg.SpanMetrics.Counts = false
-	    newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
-	case spanmetrics.CountsName:
-	    cfg.SpanMetrics.Latency = false
-	    cfg.SpanMetrics.HistogramBuckets = nil
-	    newProcessor = spanmetrics.New(cfg.SpanMetrics, i.registry)
 	case servicegraphs.Name:
 		newProcessor = servicegraphs.New(cfg.ServiceGraphs, i.instanceID, i.registry, i.logger)
 	default:

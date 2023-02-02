@@ -62,32 +62,18 @@ func New(cfg Config, registry registry.Registry) gen.Processor {
 		labels = append(labels, sanitizeLabelNameWithCollisions(d))
 	}
 
-	if (cfg.Latency && cfg.Counts) {
-        return &Processor{
-            Cfg:                        cfg,
-            registry:                   registry,
-            spanMetricsCallsTotal:      registry.NewCounter(metricCallsTotal, labels),
-            spanMetricsDurationSeconds: registry.NewHistogram(metricDurationSeconds, labels, cfg.HistogramBuckets),
-            spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
-            now:                        time.Now,
-        }
-    } else if (cfg.Latency) {
-        return &Processor{
-            Cfg:                        cfg,
-            registry:                   registry,
-            spanMetricsDurationSeconds: registry.NewHistogram(metricDurationSeconds, labels, cfg.HistogramBuckets),
-            spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
-            now:                        time.Now,
-        }
-    } else {
-        return &Processor{
-            Cfg:                        cfg,
-            registry:                   registry,
-            spanMetricsCallsTotal:      registry.NewCounter(metricCallsTotal, labels),
-            spanMetricsSizeTotal:       registry.NewCounter(metricSizeTotal, labels),
-            now:                        time.Now,
-        }
-    }
+    p := &Processor{}
+	if cfg.Subprocessors["Latency"] {
+	    p.spanMetricsDurationSeconds = registry.NewHistogram(metricDurationSeconds, labels, cfg.HistogramBuckets)
+	}
+	if cfg.Subprocessors["Count"] {
+	    p.spanMetricsCallsTotal = registry.NewCounter(metricCallsTotal, labels)
+	}
+	p.Cfg = cfg
+	p.registry = registry
+	p.spanMetricsSizeTotal = registry.NewCounter(metricSizeTotal, labels)
+	p.now = time.Now
+	return p
 }
 
 func (p *Processor) Name() string {
@@ -144,13 +130,14 @@ func (p *Processor) aggregateMetricsForSpan(svcName string, rs *v1.Resource, spa
 
 	registryLabelValues := p.registry.NewLabelValues(labelValues)
 
-    if p.Cfg.Counts {
+    if p.Cfg.Subprocessors["Count"] {
+        fmt.Println("IN COUNTS x2")
 	    p.spanMetricsCallsTotal.Inc(registryLabelValues, 1)
 	}
 
 	p.spanMetricsSizeTotal.Inc(registryLabelValues, float64(span.Size()))
 
-	if p.Cfg.Latency {
+	if p.Cfg.Subprocessors["Latency"] {
 	    p.spanMetricsDurationSeconds.ObserveWithExemplar(registryLabelValues, latencySeconds, tempo_util.TraceIDToHexString(span.TraceId))
 	}
 }
