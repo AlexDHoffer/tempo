@@ -80,14 +80,7 @@ type instance struct {
 // If we see both span metric subprocessors, we replace this item with "span-metrics", as they are the same thing, and use default behavior
 // If we see only one or the other subprocessor, we replace the item with "span-metrics", and toggle on the Subprocessor chosen
 func setSpanMetricsSubprocessors(cfg *Config, instanceID string, overrides metricsGeneratorOverrides) {
-    //fmt.Println("overrides from newInstance")
-    //fmt.Println(overrides.MetricsGeneratorProcessors(instanceID))
     desiredProcessors := overrides.MetricsGeneratorProcessors(instanceID)
-
-    //fmt.Println("config from newInstance")
-    c := *cfg
-    spanMetricsConfig := c.Processor.SpanMetrics
-    //fmt.Println(c.Processor.SpanMetrics)
 
     _, spanMetricsAll := desiredProcessors["span-metrics"]
     _, spanMetricsCount := desiredProcessors["span-metrics-count"]
@@ -103,12 +96,12 @@ func setSpanMetricsSubprocessors(cfg *Config, instanceID string, overrides metri
     } else if (spanMetricsLatency) {
         delete(desiredProcessors, "span-metrics-latency")
         desiredProcessors["span-metrics"] = struct{}{}
-        spanMetricsConfig.Subprocessors["Count"] = false
+        cfg.Processor.SpanMetrics.Subprocessors["Count"] = false
     } else if (spanMetricsCount) {
         delete(desiredProcessors, "span-metrics-count")
         desiredProcessors["span-metrics"] = struct{}{}
-        spanMetricsConfig.Subprocessors["Latency"] = false
-        spanMetricsConfig.HistogramBuckets = nil
+        cfg.Processor.SpanMetrics.Subprocessors["Latency"] = false
+        cfg.Processor.SpanMetrics.HistogramBuckets = nil
     }
 }
 
@@ -116,10 +109,6 @@ func newInstance(cfg *Config, instanceID string, overrides metricsGeneratorOverr
 	logger = log.With(logger, "tenant", instanceID)
 
 	setSpanMetricsSubprocessors(cfg, instanceID, overrides)
-	fmt.Println("From newInstance")
-	// This nil is only sticking here, not in setSpanMetricsSubprocessors
-	cfg.Processor.SpanMetrics.HistogramBuckets = nil
-	fmt.Println(cfg.Processor.SpanMetrics)
 
 	i := &instance{
 		cfg:        cfg,
@@ -169,11 +158,6 @@ func (i *instance) watchOverrides() {
 
 func (i *instance) updateProcessors() error {
 	desiredProcessors := i.overrides.MetricsGeneratorProcessors(i.instanceID)
-
-	fmt.Println("Desired Processors from updateProcessors:")
-	fmt.Println(desiredProcessors)
-    fmt.Println("Desired Cfg from updateProcessors:")
-    fmt.Println(i.cfg.Processor)
 	desiredCfg, err := i.cfg.Processor.copyWithOverrides(i.overrides, i.instanceID)
 	if err != nil {
 		return err

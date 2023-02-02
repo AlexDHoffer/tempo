@@ -2,7 +2,6 @@ package spanmetrics
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -37,9 +36,6 @@ type Processor struct {
 }
 
 func New(cfg Config, registry registry.Registry) gen.Processor {
-    fmt.Println("Cfg from New:")
-    fmt.Println(cfg)
-
 	labels := make([]string, 0, 4+len(cfg.Dimensions))
 
 	if cfg.IntrinsicDimensions.Service {
@@ -131,7 +127,6 @@ func (p *Processor) aggregateMetricsForSpan(svcName string, rs *v1.Resource, spa
 	registryLabelValues := p.registry.NewLabelValues(labelValues)
 
     if p.Cfg.Subprocessors["Count"] {
-        fmt.Println("IN COUNTS x2")
 	    p.spanMetricsCallsTotal.Inc(registryLabelValues, 1)
 	}
 
