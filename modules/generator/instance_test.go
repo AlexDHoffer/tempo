@@ -69,6 +69,21 @@ func Test_instance_concurrency(t *testing.T) {
 
 }
 
+// 5 cases. (1) span metrics only, expected Latency and counts subs
+// (2) span-metrics, span-latency indicated . expected latency and counts subs
+// (3) span-latency, span-count indicated . expected latency and counts subs
+// (4) span-latency only indicated . expected latency only subs
+// (5) non-existent subprocessor type indicated. Not flagged, expected to be caught by check for valid processors.
+func Test_instance_setSpanMetricsSubprocessor(t *testing.T) {
+    cfg := Config{}
+	cfg.RegisterFlagsAndApplyDefaults("", &flag.FlagSet{})
+	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
+	overrides := mockOverrides{}
+
+
+	setSpanMetricsSubprocessors(&cfg, "test", &overrides)
+}
+
 func Test_instance_updateProcessors(t *testing.T) {
 	cfg := Config{}
 	cfg.RegisterFlagsAndApplyDefaults("", &flag.FlagSet{})
