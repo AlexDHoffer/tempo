@@ -27,7 +27,7 @@ type Config struct {
 	// Additional dimensions (labels) to be added to the metric. The dimensions are generated
 	// from span attributes and are created along with the intrinsic dimensions.
 	Dimensions []string `yaml:"dimensions"`
-	// Subprocessor options for this Processor include Latency, Counts
+	// Subprocessor options for this Processor include Latency, Count, Size
 	// These are metrics categories that exist under the umbrella of Span Metrics
 	Subprocessors map[Subprocessor]bool
 }

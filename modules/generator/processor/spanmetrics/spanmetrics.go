@@ -65,9 +65,11 @@ func New(cfg Config, registry registry.Registry) gen.Processor {
 	if cfg.Subprocessors[Count] {
 		p.spanMetricsCallsTotal = registry.NewCounter(metricCallsTotal, labels)
 	}
+	if cfg.Subprocessors[Size] {
+		p.spanMetricsSizeTotal = registry.NewCounter(metricSizeTotal, labels)
+	}
 	p.Cfg = cfg
 	p.registry = registry
-	p.spanMetricsSizeTotal = registry.NewCounter(metricSizeTotal, labels)
 	p.now = time.Now
 	return p
 }
@@ -130,10 +132,12 @@ func (p *Processor) aggregateMetricsForSpan(svcName string, rs *v1.Resource, spa
 		p.spanMetricsCallsTotal.Inc(registryLabelValues, 1)
 	}
 
-	p.spanMetricsSizeTotal.Inc(registryLabelValues, float64(span.Size()))
-
 	if p.Cfg.Subprocessors[Latency] {
 		p.spanMetricsDurationSeconds.ObserveWithExemplar(registryLabelValues, latencySeconds, tempo_util.TraceIDToHexString(span.TraceId))
+	}
+
+	if p.Cfg.Subprocessors[Size] {
+		p.spanMetricsSizeTotal.Inc(registryLabelValues, float64(span.Size()))
 	}
 }
 
